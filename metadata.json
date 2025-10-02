@@ -1,0 +1,5 @@
+{
+  "name": "Cadet Study Helper",
+  "description": "An AI-powered study assistant for academy cadets. It uses the content from official curriculum PDFs to answer questions and help cadets prepare for exams.",
+  "requestFramePermissions": []
+}

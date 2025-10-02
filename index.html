@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cadet Study Helper</title>
+    <!-- Include PDF.js library from a CDN -->
+    <script src="https://mozilla.github.io/pdf.js/build/pdf.js"></script>
+    <style>
+      :root {
+        --slate-50: #f8fafc; --slate-100: #f1f5f9; --slate-300: #cbd5e1; --slate-400: #94a3b8; --slate-500: #64748b; --slate-600: #475569; --slate-700: #334152; --slate-800: #1e293b; --slate-900: #0f172a;
+        --blue-500: #3b82f6; --blue-600: #2563eb; --blue-700: #1d4ed8; --blue-800: #1e40af;
+        --white: #ffffff; --yellow-200: #fef08a;
+      }
+      body { margin: 0; background-color: var(--slate-100); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+      .app-container { display: flex; height: 100vh; font-size: 16px; color: var(--slate-800); }
+      
+      /* --- Sidebar --- */
+      #csh-sidebar { width: 320px; background-color: var(--slate-800); color: var(--white); display: flex; flex-direction: column; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1); }
+      #csh-sidebar header { padding: 1rem; border-bottom: 1px solid var(--slate-700); }
+      #csh-sidebar header h2 { margin: 0; text-align: center; font-size: 1.25rem; font-weight: 700; }
+      #csh-sidebar nav { flex: 1; overflow-y: auto; }
+      #csh-sidebar ul { list-style: none; margin: 0; padding: 0; }
+      #csh-sidebar li { border-bottom: 1px solid var(--slate-700); }
+      #csh-sidebar button { width: 100%; text-align: left; padding: 1rem; font-size: 0.875rem; border: none; background: none; color: var(--slate-300); cursor: pointer; display: flex; align-items: center; gap: 0.75rem; transition: background-color 0.2s, color 0.2s; }
+      #csh-sidebar button:hover { background-color: var(--slate-700); color: var(--white); }
+      #csh-sidebar button.pdf-btn { font-weight: 600; color: var(--white); }
+      #csh-sidebar button.pdf-btn.active { background-color: var(--blue-700); }
+      #csh-sidebar footer { padding: 1rem; font-size: 0.75rem; color: var(--slate-400); border-top: 1px solid var(--slate-700); text-align: center; }
+
+      /* --- Debug Panel --- */
+      #csh-debug-panel { padding: 1rem; border-top: 1px solid var(--slate-700); background-color: var(--slate-900); }
+      #csh-debug-panel h3 { font-size: 0.875rem; font-weight: 600; color: var(--slate-300); margin: 0 0 0.5rem 0; }
+      #csh-debug-panel label { font-size: 0.75rem; color: var(--slate-400); display: block; margin-bottom: 0.25rem; }
+      #csh-debug-path-input { width: 100%; box-sizing: border-box; background-color: var(--slate-800); border: 1px solid var(--slate-600); color: var(--white); padding: 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; margin-bottom: 0.5rem; }
+      #csh-debug-load-btn { font-size: 0.75rem; padding: 0.5rem 1rem; background-color: var(--blue-600); border: none; border-radius: 0.25rem; color: var(--white); cursor: pointer; width: 100%; }
+      #csh-debug-load-btn:hover { background-color: var(--blue-700); }
+      #csh-debug-log { background-color: #000; color: #0f0; font-family: monospace; font-size: 0.7rem; padding: 0.5rem; height: 150px; overflow-y: scroll; border: 1px solid var(--slate-700); border-radius: 0.25rem; white-space: pre-wrap; word-break: break-all; margin-top: 0.75rem; }
+
+      /* --- Main Panel --- */
+      #csh-main { flex: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+      #csh-main-header { display: flex; align-items: center; justify-content: space-between; padding: 1rem; border-bottom: 1px solid var(--slate-300); background-color: var(--white); box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); }
+      #csh-main-header h1 { font-size: 1.25rem; font-weight: 700; margin: 0; color: var(--slate-800); }
+      
+      .logo-container { display: flex; align-items: center; gap: 0.5rem; color: var(--blue-800); font-size: 1.125rem; font-weight: 700; }
+      .logo-container svg { height: 2rem; width: 2rem; }
+
+      /* --- Content Area --- */
+      #csh-content-area { flex: 1; padding: 1.5rem; overflow-y: auto; background-color: var(--slate-50); }
+      .message-state { text-align: center; margin: auto; padding: 2rem; color: var(--slate-500); }
+      .message-state h3 { font-size: 1.125rem; color: var(--slate-700); margin: 0 0 0.5rem 0; }
+      .search-result-card { background-color: var(--white); padding: 1rem; border-radius: 0.5rem; box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.1); margin-bottom: 1rem; }
+      .search-result-card p { margin: 0; font-size: 0.9rem; line-height: 1.6; color: var(--slate-700); }
+      .search-result-card mark { background-color: var(--yellow-200); padding: 0.125rem 0.25rem; border-radius: 0.25rem; font-weight: 600; color: var(--slate-800); }
+      #csh-results-header { font-weight: 600; color: var(--slate-600); margin-bottom: 1rem; border-bottom: 1px solid var(--slate-300); padding-bottom: 0.5rem; }
+
+      /* --- Input Form --- */
+      #csh-input-area { padding: 1rem; background-color: var(--white); border-top: 1px solid var(--slate-300); }
+      #csh-input-area form { position: relative; }
+      #csh-input-text { width: 100%; box-sizing: border-box; padding: 0.75rem 3.5rem 0.75rem 1rem; border: 1px solid var(--slate-300); border-radius: 9999px; transition: box-shadow 0.2s; }
+      #csh-input-text:focus { outline: none; box-shadow: 0 0 0 2px var(--blue-500); }
+      #csh-input-text:disabled { background-color: var(--slate-100); }
+      #csh-submit-btn { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); padding: 0.625rem; background-color: var(--blue-600); color: var(--white); border: none; border-radius: 9999px; cursor: pointer; transition: background-color 0.2s; }
+      #csh-submit-btn:hover { background-color: var(--blue-700); }
+      #csh-submit-btn:disabled { background-color: var(--slate-400); cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <aside id="csh-sidebar">
+            <header>
+                <h2>Curriculum Menu</h2>
+            </header>
+            <nav id="csh-sidebar-nav"></nav>
+            <div id="csh-debug-panel">
+                <h3>Debug Tools</h3>
+                <label for="csh-debug-path-input">SharePoint Folder Path</label>
+                <input type="text" id="csh-debug-path-input">
+                <button id="csh-debug-load-btn">Reload from Path</button>
+                <pre id="csh-debug-log"></pre>
+            </div>
+            <footer>Cadet Study Helper</footer>
+        </aside>
+        <main id="csh-main">
+            <header id="csh-main-header">
+                <h1 id="csh-header-title"></h1>
+                <div class="logo-container">
+                    <span id="csh-logo-icon"></span>
+                    <span>Cadet Compass</span>
+                </div>
+            </header>
+            <div id="csh-content-area"></div>
+            <div id="csh-input-area">
+                <form id="csh-input-form">
+                    <input type="text" id="csh-input-text" placeholder="Loading..." autocomplete="off" disabled>
+                    <button type="submit" id="csh-submit-btn" aria-label="Search" disabled>
+                        <span id="csh-search-icon"></span>
+                    </button>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script>
+      (function() {
+        // --- IMPORTANT CONFIGURATION ---
+        const initialCurriculumFolderUrl = "/sites/SH-PSA/SiteAssets/SitePages/TrainingHome/PSA BCO Curriculum Books";
+
+        // --- Icon Definitions ---
+        const icons = {
+            book: `<svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>`,
+            search: `<svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>`,
+            logo: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>`
+        };
+
+        // --- DOM Elements ---
+        const $ = (id) => document.getElementById(id);
+        const el = {
+            sidebarNav: $('csh-sidebar-nav'),
+            headerTitle: $('csh-header-title'),
+            contentArea: $('csh-content-area'),
+            inputForm: $('csh-input-form'),
+            inputText: $('csh-input-text'),
+            submitBtn: $('csh-submit-btn'),
+            debug: {
+                pathInput: $('csh-debug-path-input'),
+                loadBtn: $('csh-debug-load-btn'),
+                log: $('csh-debug-log'),
+            }
+        };
+        
+        // --- Debug Logger ---
+        function logDebug(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            let formattedMessage;
+            if (typeof message === 'object' && message !== null) {
+                formattedMessage = JSON.stringify(message, null, 2);
+            } else {
+                formattedMessage = String(message);
+            }
+            const logEntry = `[${timestamp}] ${formattedMessage}\n\n`;
+            el.debug.log.textContent += logEntry;
+            el.debug.log.scrollTop = el.debug.log.scrollHeight; // Auto-scroll to bottom
+        }
+
+        // --- State & Cache ---
+        let pdfs = []; // Will be populated dynamically from SharePoint
+        let state = {
+            selectedPdfId: null,
+            searchResults: null,
+            currentSearchTerm: '',
+            isLoading: true,
+            error: null,
+        };
+        let pdfCache = {}; // Cache for extracted PDF text content
+
+        // --- SharePoint API Service ---
+        async function fetchPdfsFromSharePoint(folderUrl) {
+            logDebug(`Attempting to fetch PDFs from folder: ${folderUrl}`);
+            const encodedFolderUrl = folderUrl.replace(/ /g, '%20');
+            const apiUrl = `/_api/web/GetFolderByServerRelativeUrl('${encodedFolderUrl}')/Files`;
+            logDebug(`Requesting API URL: ${apiUrl}`);
+            
+            try {
+                const response = await fetch(apiUrl, {
+                    headers: { 'Accept': 'application/json;odata=nometadata' },
+                    credentials: 'same-origin'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`SharePoint API request failed with status ${response.status}: ${response.statusText}`);
+                }
+                const data = await response.json();
+                logDebug('Received SharePoint API response:');
+                logDebug(data);
+
+                if (!data.value) throw new Error('Invalid response structure from SharePoint API. Expected a "value" property.');
+
+                pdfs = data.value
+                    .filter(file => file.Name.toLowerCase().endsWith('.pdf'))
+                    .map(file => ({
+                        id: file.UniqueId,
+                        title: file.Name.replace(/\.pdf$/i, '').replace(/--/g, ' ').replace(/-/g, ' '),
+                        url: file.ServerRelativeUrl
+                    }))
+                    .sort((a, b) => a.title.localeCompare(b.title));
+                
+                logDebug(`Discovered and parsed ${pdfs.length} PDF(s):`);
+                logDebug(pdfs.map(p => p.title));
+
+                if (pdfs.length === 0) {
+                    state.error = `No PDF files found in the specified folder: ${folderUrl}`;
+                    logDebug(`ERROR: ${state.error}`);
+                } else {
+                    state.selectedPdfId = pdfs[0].id;
+                }
+            } catch (error) {
+                logDebug('CRITICAL ERROR fetching from SharePoint:');
+                logDebug(error.toString());
+                console.error('Failed to fetch PDFs from SharePoint:', error);
+                let userErrorMessage = `Could not fetch the curriculum list from SharePoint. Please check the folder path and your permissions.`;
+                if (window.location.protocol === 'file:') {
+                    userErrorMessage += ' This app cannot be run directly from your local computer; it must be hosted on your SharePoint site.';
+                } else {
+                    userErrorMessage += ` Details: ${error.message}. Check the browser console (F12) for more technical information.`;
+                }
+                state.error = userErrorMessage;
+                pdfs = [];
+            }
+        }
+
+        // --- PDF Service ---
+        async function loadAndCachePdf(pdf) {
+            if (!pdf || pdfCache[pdf.id]) {
+                logDebug(`PDF "${pdf?.title}" is already in cache or invalid. Skipping load.`);
+                state.isLoading = false;
+                updateUI();
+                return;
+            }
+            
+            logDebug(`Loading PDF: "${pdf.title}"...`);
+            state.isLoading = true;
+            state.error = null;
+            updateUI();
+
+            try {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = `https://mozilla.github.io/pdf.js/build/pdf.worker.js`;
+                const pdfDocument = await pdfjsLib.getDocument(pdf.url).promise;
+                let fullText = '';
+                
+                for (let i = 1; i <= pdfDocument.numPages; i++) {
+                    const page = await pdfDocument.getPage(i);
+                    const textContent = await page.getTextContent();
+                    fullText += textContent.items.map(item => item.str).join(' ') + '\n';
+                }
+                pdfCache[pdf.id] = fullText;
+                logDebug(`Successfully loaded and cached "${pdf.title}".`);
+            } catch (error) {
+                logDebug(`ERROR loading PDF from URL: ${pdf.url}`);
+                logDebug(error.toString());
+                console.error(`Error loading PDF from URL: ${pdf.url}`, error);
+                state.error = `Failed to load and parse the PDF: "${pdf.title}". This can happen due to network issues or if the file is corrupted.`;
+            } finally {
+                state.isLoading = false;
+                updateUI();
+            }
+        }
+
+        // --- Search Service ---
+        function performSearch(term, content) {
+            if (!term || !content) return [];
+            const results = [];
+            const snippetRadius = 100;
+            const regex = new RegExp(escapeRegExp(term), 'gi');
+            let match;
+            
+            while ((match = regex.exec(content)) !== null) {
+                const startIndex = Math.max(0, match.index - snippetRadius);
+                const endIndex = Math.min(content.length, match.index + match[0].length + snippetRadius);
+                let snippet = content.substring(startIndex, endIndex);
+                if (startIndex > 0) snippet = '...' + snippet;
+                if (endIndex < content.length) snippet = snippet + '...';
+                snippet = escapeHtml(snippet).replace(regex, (match) => `<mark>${match}</mark>`);
+                results.push({ snippet: snippet });
+            }
+            return results;
+        }
+        function escapeRegExp(string) { return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+        function escapeHtml(unsafe) { return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
+
+        // --- Render Functions ---
+        function renderSidebar() {
+            const ul = document.createElement('ul');
+            pdfs.forEach(pdf => {
+                const li = document.createElement('li');
+                const pdfBtn = document.createElement('button');
+                pdfBtn.className = 'pdf-btn';
+                pdfBtn.innerHTML = `${icons.book} <span>${pdf.title}</span>`;
+                pdfBtn.dataset.pdfId = pdf.id;
+                if (pdf.id === state.selectedPdfId) pdfBtn.classList.add('active');
+                li.appendChild(pdfBtn);
+                ul.appendChild(li);
+            });
+            el.sidebarNav.innerHTML = '';
+            el.sidebarNav.appendChild(ul);
+        }
+
+        function renderHeader() {
+            const pdf = pdfs.find(p => p.id === state.selectedPdfId);
+            el.headerTitle.textContent = pdf?.title || 'Cadet Study Helper';
+        }
+
+        function renderContentArea() {
+            el.contentArea.innerHTML = '';
+            
+            if (state.isLoading && !state.searchResults) {
+                const loadingDiv = document.createElement('div');
+                loadingDiv.className = 'message-state';
+                loadingDiv.innerHTML = `<h3>${pdfCache[state.selectedPdfId] ? 'Searching...' : 'Loading Curriculum...'}</h3><p>Please wait a moment.</p>`;
+                el.contentArea.appendChild(loadingDiv);
+                return;
+            }
+
+            if (state.error) {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'message-state';
+                errorDiv.innerHTML = `<h3>An Error Occurred</h3><p>${escapeHtml(state.error)}</p>`;
+                el.contentArea.appendChild(errorDiv);
+                return;
+            }
+
+            if (state.searchResults === null) {
+                const emptyDiv = document.createElement('div');
+                emptyDiv.className = 'message-state';
+                const message = pdfs.length > 0 ? 'Enter a search term below to find relevant information.' : 'No curriculums found. Check the debug log in the sidebar for details.';
+                emptyDiv.innerHTML = `<h3>Search Curriculum</h3><p>${message}</p>`;
+                el.contentArea.appendChild(emptyDiv);
+                return;
+            }
+
+            if (state.searchResults.length === 0) {
+                const noResultsDiv = document.createElement('div');
+                noResultsDiv.className = 'message-state';
+                noResultsDiv.innerHTML = `<h3>No Results Found</h3><p>Your search for "<strong>${escapeHtml(state.currentSearchTerm)}</strong>" did not return any matches.</p>`;
+                el.contentArea.appendChild(noResultsDiv);
+                return;
+            }
+            
+            const header = document.createElement('div');
+            header.id = 'csh-results-header';
+            header.innerHTML = `${state.searchResults.length} result(s) for "<strong>${escapeHtml(state.currentSearchTerm)}</strong>"`;
+            el.contentArea.appendChild(header);
+
+            state.searchResults.forEach(result => {
+                const card = document.createElement('div');
+                card.className = 'search-result-card';
+                card.innerHTML = `<p>${result.snippet}</p>`;
+                el.contentArea.appendChild(card);
+            });
+            el.contentArea.scrollTop = 0;
+        }
+
+        function updateUI() {
+            const isReadyToSearch = !state.isLoading && !state.error && pdfs.length > 0 && !!pdfCache[state.selectedPdfId];
+            el.submitBtn.disabled = !el.inputText.value.trim() || !isReadyToSearch;
+            el.inputText.disabled = !isReadyToSearch;
+
+            if (state.error) {
+                el.inputText.placeholder = 'An error occurred. See message.';
+                el.inputText.disabled = true;
+            } else if (state.isLoading) {
+                 el.inputText.placeholder = 'Loading...';
+                 el.inputText.disabled = true;
+            } else if (pdfs.length === 0) {
+                el.inputText.placeholder = 'No curriculums found.';
+                el.inputText.disabled = true;
+            } else if (!pdfCache[state.selectedPdfId]) {
+                el.inputText.placeholder = 'Curriculum is loading...';
+                el.inputText.disabled = true;
+            } else {
+                 el.inputText.placeholder = 'Search the selected curriculum...';
+            }
+            
+            renderHeader();
+            renderContentArea();
+            renderSidebar();
+        }
+
+        // --- Event Handlers ---
+        function handleSearch(e) {
+            e.preventDefault();
+            const searchTerm = el.inputText.value.trim();
+            if (!searchTerm) return;
+            const content = pdfCache[state.selectedPdfId];
+            if (!content) return;
+            state.searchResults = performSearch(searchTerm, content);
+            state.currentSearchTerm = searchTerm;
+            updateUI();
+        }
+        
+        async function handleSidebarClick(e) {
+            const target = e.target.closest('button');
+            if (!target) return;
+            const pdfId = target.dataset.pdfId;
+            if (pdfId && pdfId !== state.selectedPdfId) {
+                state.selectedPdfId = pdfId;
+                state.searchResults = null;
+                state.currentSearchTerm = '';
+                el.inputText.value = '';
+                await loadAndCachePdf(pdfs.find(p => p.id === pdfId));
+            }
+        }
+        
+        function handleInput() {
+            const isReadyToSearch = !state.isLoading && !!pdfCache[state.selectedPdfId];
+            el.submitBtn.disabled = !el.inputText.value.trim() || !isReadyToSearch;
+        }
+
+        async function handleReloadFromPath() {
+            const newPath = el.debug.pathInput.value.trim();
+            if (!newPath) {
+                logDebug("Error: Path input is empty.");
+                return;
+            }
+            logDebug("==================================");
+            logDebug("Reloading with new path...");
+            
+            // Reset state
+            pdfs = [];
+            pdfCache = {};
+            state = {
+                selectedPdfId: null,
+                searchResults: null,
+                currentSearchTerm: '',
+                isLoading: true,
+                error: null,
+            };
+            el.inputText.value = '';
+            updateUI();
+
+            await fetchPdfsFromSharePoint(newPath);
+            
+            if (pdfs.length > 0 && state.selectedPdfId) {
+                const initialPdf = pdfs.find(p => p.id === state.selectedPdfId);
+                await loadAndCachePdf(initialPdf);
+            } else {
+                state.isLoading = false;
+                updateUI();
+            }
+        }
+
+        // --- Initialization ---
+        async function init() {
+            $('csh-logo-icon').innerHTML = icons.logo;
+            $('csh-search-icon').innerHTML = icons.search;
+            el.debug.pathInput.value = initialCurriculumFolderUrl;
+            
+            el.inputForm.addEventListener('submit', handleSearch);
+            el.sidebarNav.addEventListener('click', handleSidebarClick);
+            el.inputText.addEventListener('input', handleInput);
+            el.debug.loadBtn.addEventListener('click', handleReloadFromPath);
+
+            logDebug("Application initialized.");
+            await fetchPdfsFromSharePoint(initialCurriculumFolderUrl);
+            
+            if (pdfs.length > 0 && state.selectedPdfId) {
+                const initialPdf = pdfs.find(p => p.id === state.selectedPdfId);
+                await loadAndCachePdf(initialPdf);
+            } else {
+                state.isLoading = false;
+                updateUI();
+            }
+        }
+
+        init();
+      })();
+    </script>
+</body>
+</html>
